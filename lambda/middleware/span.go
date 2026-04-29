@@ -5,9 +5,6 @@ package middleware
 
 import (
 	"context"
-	"strconv"
-	"strings"
-
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	awsmiddleware "github.com/ellogroup/ello-golang-aws/lambda/middleware"
@@ -17,6 +14,8 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 	"go.opentelemetry.io/otel/trace"
+	"strconv"
+	"strings"
 )
 
 // NewAPIGatewayV1 returns a WithResponse middleware that:

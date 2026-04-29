@@ -4,9 +4,8 @@
 package transport
 
 import (
-	"net/http"
-
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"net/http"
 )
 
 // New wraps base with an OpenTelemetry HTTP transport that:
