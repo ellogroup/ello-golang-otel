@@ -1,9 +1,8 @@
 package dflt
 
 import (
-	"testing"
-
 	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 func TestStrToBoolOrDefault(t *testing.T) {
@@ -32,6 +31,12 @@ func TestStrToFloat64OrDefault(t *testing.T) {
 	}{
 		{"0.5", 1.0, 0.5},
 		{"1.0", 0.5, 1.0},
+		{"0.0", 1.0, 0.0},
+		{"0", 1.0, 0.0},
+		{"-1.0", 0.0, -1.0},
+		{"-0.5", 0.0, -0.5},
+		{"1", 0.0, 1.0},
+		{"42", 0.0, 42.0},
 		{"invalid", 1.0, 1.0},
 		{"", 0.5, 0.5},
 	}
