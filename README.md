@@ -82,6 +82,30 @@ allMiddlewares := append(
 )
 ```
 
+## AWS
+
+### Middleware
+
+Instruments all AWS SDK v2 calls with OpenTelemetry client spans. Each SDK call records `aws.service`,
+`aws.operation`, `aws.region`, and `aws.request_id` attributes, and propagates W3C trace context into
+outgoing HTTP request headers.
+
+Call `AppendToConfig` once after building your `aws.Config`:
+
+```go
+cfg, err := awsconfig.LoadDefaultConfig(ctx)
+if err != nil {
+    // handle error
+}
+awsmiddleware.AppendToConfig(&cfg)
+```
+
+The global TracerProvider (set by `provider.NewTracerProvider`) is used automatically. When OTEL is
+disabled the global provider is a no-op so spans are zero-overhead.
+
+Do **not** also wrap the AWS HTTP transport with `http/transport.New` — `otelaws` handles trace
+propagation at the SDK middleware layer; double-wrapping creates duplicate spans.
+
 ## HTTP
 
 ### Transport
