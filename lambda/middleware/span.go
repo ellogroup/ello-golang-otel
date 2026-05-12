@@ -1,6 +1,5 @@
 // Package middleware provides OpenTelemetry Lambda middleware that wraps each invocation
-// in a root trace span and injects the trace ID and span ID into logctx so they appear
-// automatically on every log line produced via logctx.Zap(ctx).
+// in a root trace span.
 package middleware
 
 import (
@@ -8,7 +7,6 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	awsmiddleware "github.com/ellogroup/ello-golang-aws/lambda/middleware"
-	"github.com/ellogroup/ello-golang-ctx/logctx"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
@@ -21,10 +19,8 @@ import (
 // NewAPIGatewayV1 returns a WithResponse middleware that:
 //  1. Extracts W3C traceparent / tracestate from incoming API Gateway headers.
 //  2. Starts a root server span named "{METHOD} {path}".
-//  3. Injects trace_id and span_id into logctx so every logctx.Zap(ctx) call
-//     automatically includes them.
-//  4. Sets the span status to Error on 5xx responses or returned errors.
-//  5. Ends the span when the handler returns.
+//  3. Sets the span status to Error on 5xx responses or returned errors.
+//  4. Ends the span when the handler returns.
 //
 // Prepend this to the middleware slice before middleware.CommonAPIGatewayV1 so the
 // span covers the full request lifecycle:
@@ -58,10 +54,6 @@ func (m *apiGatewayV1SpanMiddleware) Wrap(
 			),
 		)
 		defer span.End()
-
-		// Inject trace_id and span_id into logctx so all subsequent log calls
-		// via logctx.Zap(ctx) automatically carry them.
-		ctx = injectSpanContext(ctx, span)
 
 		resp, err := next(ctx, event)
 
@@ -106,8 +98,6 @@ func (m *noResponseSpanMiddleware[E]) Wrap(
 		)
 		defer span.End()
 
-		ctx = injectSpanContext(ctx, span)
-
 		err := next(ctx, event)
 		if err != nil {
 			span.RecordError(err)
@@ -116,19 +106,6 @@ func (m *noResponseSpanMiddleware[E]) Wrap(
 
 		return err
 	}
-}
-
-// injectSpanContext adds trace_id and span_id from span into logctx.
-// Only injects when the span context is valid (i.e. OTEL is enabled).
-func injectSpanContext(ctx context.Context, span trace.Span) context.Context {
-	sc := span.SpanContext()
-	if !sc.IsValid() {
-		return ctx
-	}
-	return logctx.Add(ctx,
-		logctx.String("trace_id", sc.TraceID().String()),
-		logctx.String("span_id", sc.SpanID().String()),
-	)
 }
 
 // lowercaseHeaders returns a copy of headers with all keys lowercased.
