@@ -57,8 +57,7 @@ defer shutdown(ctx)
 
 ### Middleware
 
-OTEL middleware wraps Lambda handlers in a root span and injects `trace_id` and `span_id` into
-[logctx](https://github.com/ellogroup/ello-golang-ctx) so they appear automatically on every structured log line.
+OTEL middleware wraps Lambda handlers in a root span.
 
 For API Gateway v1 handlers, use `NewAPIGatewayV1`. Prepend it to the middleware slice so the span covers
 the full request lifecycle:
@@ -105,6 +104,24 @@ disabled the global provider is a no-op so spans are zero-overhead.
 
 Do **not** also wrap the AWS HTTP transport with `http/transport.New` — `otelaws` handles trace
 propagation at the SDK middleware layer; double-wrapping creates duplicate spans.
+
+## slog
+
+### Handler
+
+Wraps any `slog.Handler` to inject `trace_id` and `span_id` from the active OpenTelemetry span into every log record. When no span is active (or OTEL is disabled), no extra attributes are added.
+
+```go
+inner := slog.NewJSONHandler(os.Stdout, nil)
+logger := slog.New(handler.New(inner))
+```
+
+Pass a context carrying an active span when logging and the fields are added automatically:
+
+```go
+logger.InfoContext(ctx, "order processed", slog.String("order_id", id))
+// {"time":"...","level":"INFO","msg":"order processed","order_id":"...","trace_id":"...","span_id":"..."}
+```
 
 ## HTTP
 
