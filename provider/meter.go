@@ -26,8 +26,7 @@ func NewMeterProvider(ctx context.Context, cfg config.Config) (metric.Meter, fun
 	}
 
 	exp, err := otlpmetrichttp.New(ctx,
-		otlpmetrichttp.WithEndpoint(cfg.Endpoint),
-		otlpmetrichttp.WithInsecure(),
+		otlpmetrichttp.WithEndpointURL(cfg.Endpoint),
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("creating OTLP metric exporter: %w", err)

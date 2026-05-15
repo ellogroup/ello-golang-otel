@@ -35,8 +35,7 @@ func NewTracerProvider(ctx context.Context, cfg config.Config) (trace.Tracer, fu
 	}
 
 	exp, err := otlptracehttp.New(ctx,
-		otlptracehttp.WithEndpoint(cfg.Endpoint),
-		otlptracehttp.WithInsecure(),
+		otlptracehttp.WithEndpointURL(cfg.Endpoint),
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("creating OTLP trace exporter: %w", err)
