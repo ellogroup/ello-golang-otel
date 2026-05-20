@@ -1,5 +1,6 @@
 DOCKER_IMG_TAGGED = ellogroup/ello-golang-otel:latest
-DOCKER_RUN = docker run --rm -it --platform linux/amd64 $(DOCKER_IMG_TAGGED)
+DOCKER_RUN = docker run --rm --platform linux/amd64 $(DOCKER_IMG_TAGGED)
+DOCKER_RUN_SRC = docker run --rm --platform linux/amd64 -v $(CURDIR):/src/app $(DOCKER_IMG_TAGGED)
 
 .PHONY: build-format-test
 build-format-test: build format test
@@ -7,11 +8,12 @@ build-format-test: build format test
 .PHONY: build
 build:
 	docker build --platform linux/amd64 -t $(DOCKER_IMG_TAGGED) .
-	docker run --rm -it --platform linux/amd64 -v $(CURDIR)/go.mod:/src/app/go.mod -v $(CURDIR)/go.sum:/src/app/go.sum $(DOCKER_IMG_TAGGED) go mod tidy
+	$(DOCKER_RUN_SRC) go mod tidy
 
 .PHONY: format
 format:
-	$(DOCKER_RUN) gofmt -w ./
+	$(DOCKER_RUN_SRC) gofmt -w ./
+	$(DOCKER_RUN_SRC) go fix ./...
 
 .PHONY: test
 test: static-tests unit-tests

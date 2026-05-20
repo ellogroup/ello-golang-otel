@@ -57,14 +57,14 @@ defer shutdown(ctx)
 
 ### Middleware
 
-OTEL middleware wraps Lambda handlers in a root span.
+OTEL middleware wraps Lambda handlers in a root span and records invocation metrics.
 
 For API Gateway v1 handlers, use `NewAPIGatewayV1`. Prepend it to the middleware slice so the span covers
 the full request lifecycle:
 
 ```go
 allMiddlewares := append(
-    middleware.APIGatewayV1{otelmiddleware.NewAPIGatewayV1(tracer)},
+    middleware.APIGatewayV1{otelmiddleware.NewAPIGatewayV1(tracer, meter)},
     commonMiddlewares...,
 )
 ```
@@ -76,10 +76,19 @@ For event-driven handlers (SQS, SNS, scheduled events) that do not return a resp
 
 ```go
 allMiddlewares := append(
-    []awsmiddleware.NoResponse[events.SQSEvent]{otelmiddleware.NewNoResponse[events.SQSEvent](tracer, "process-sqs")},
+    []awsmiddleware.NoResponse[events.SQSEvent]{otelmiddleware.NewNoResponse[events.SQSEvent](tracer, meter, "process-sqs")},
     commonMiddlewares...,
 )
 ```
+
+Both middlewares record the following metrics on every invocation:
+
+| Metric | Type | Unit | Attributes |
+|---|---|---|---|
+| `faas.invocations` | Counter | — | `faas.coldstart` (bool), `http.response.status_code` (API Gateway only), `faas.error` (NoResponse only) |
+| `faas.duration` | Histogram | ms | same as above |
+
+`faas.coldstart` is `true` only on the first invocation of each Lambda execution environment, making cold starts distinguishable from warm invocations in your metrics backend.
 
 ## AWS
 
