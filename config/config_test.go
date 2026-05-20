@@ -6,38 +6,58 @@ import (
 	"testing"
 )
 
-func TestNewFromEnv_Defaults(t *testing.T) {
-	t.Setenv("OTEL_ENABLED", "")
-	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
-	t.Setenv("OTEL_SERVICE_NAME", "")
-	t.Setenv("OTEL_SERVICE_VERSION", "")
-	t.Setenv("ENVIRONMENT", "")
-	t.Setenv("OTEL_SAMPLE_RATE", "")
-
-	cfg := config.NewFromEnv()
-
-	assert.False(t, cfg.Enabled)
-	assert.Equal(t, "", cfg.Endpoint)
-	assert.Equal(t, "unknown-service", cfg.ServiceName)
-	assert.Equal(t, "", cfg.ServiceVersion)
-	assert.Equal(t, "unknown", cfg.Environment)
-	assert.Equal(t, 1.0, cfg.SampleRate)
-}
-
-func TestNewFromEnv_AllSet(t *testing.T) {
-	t.Setenv("OTEL_ENABLED", "true")
-	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://jaeger:4318")
-	t.Setenv("OTEL_SERVICE_NAME", "my-service")
-	t.Setenv("OTEL_SERVICE_VERSION", "1.2.3")
-	t.Setenv("ENVIRONMENT", "production")
-	t.Setenv("OTEL_SAMPLE_RATE", "0.5")
-
-	cfg := config.NewFromEnv()
-
-	assert.True(t, cfg.Enabled)
-	assert.Equal(t, "http://jaeger:4318", cfg.Endpoint)
-	assert.Equal(t, "my-service", cfg.ServiceName)
-	assert.Equal(t, "1.2.3", cfg.ServiceVersion)
-	assert.Equal(t, "production", cfg.Environment)
-	assert.Equal(t, 0.5, cfg.SampleRate)
+func TestNewFromEnv(t *testing.T) {
+	tests := []struct {
+		name        string
+		env         map[string]string
+		wantEnabled bool
+		wantConfig  config.Config
+	}{
+		{
+			name: "no env vars set, returns defaults",
+			env: map[string]string{
+				"OTEL_ENABLED":                "",
+				"OTEL_EXPORTER_OTLP_ENDPOINT": "",
+				"OTEL_SERVICE_NAME":           "",
+				"OTEL_SERVICE_VERSION":        "",
+				"ENVIRONMENT":                 "",
+				"OTEL_SAMPLE_RATE":            "",
+			},
+			wantConfig: config.Config{
+				Enabled:        false,
+				Endpoint:       "",
+				ServiceName:    "unknown-service",
+				ServiceVersion: "",
+				Environment:    "unknown",
+				SampleRate:     1.0,
+			},
+		},
+		{
+			name: "all env vars set, returns configured values",
+			env: map[string]string{
+				"OTEL_ENABLED":                "true",
+				"OTEL_EXPORTER_OTLP_ENDPOINT": "http://jaeger:4318",
+				"OTEL_SERVICE_NAME":           "my-service",
+				"OTEL_SERVICE_VERSION":        "1.2.3",
+				"ENVIRONMENT":                 "production",
+				"OTEL_SAMPLE_RATE":            "0.5",
+			},
+			wantConfig: config.Config{
+				Enabled:        true,
+				Endpoint:       "http://jaeger:4318",
+				ServiceName:    "my-service",
+				ServiceVersion: "1.2.3",
+				Environment:    "production",
+				SampleRate:     0.5,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for k, v := range tt.env {
+				t.Setenv(k, v)
+			}
+			assert.Equalf(t, tt.wantConfig, config.NewFromEnv(), "NewFromEnv()")
+		})
+	}
 }
