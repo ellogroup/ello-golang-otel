@@ -36,8 +36,9 @@ func isColdStart() bool {
 //  5. Records faas.invocations and faas.duration metrics with faas.coldstart and
 //     http.response.status_code attributes.
 //
-// Prepend this to the middleware slice before middleware.CommonAPIGatewayV1 so the
-// span covers the full request lifecycle:
+// Use provider.NewLambdaTracerProvider to ensure spans are exported synchronously
+// before the Lambda container is frozen. Prepend this middleware so the span covers
+// the full request lifecycle:
 //
 //	allMiddlewares := append(middleware.APIGatewayV1{otelmiddleware.NewAPIGatewayV1(tracer, meter)}, commonMiddlewares...)
 func NewAPIGatewayV1(tracer trace.Tracer, meter metric.Meter) awsmiddleware.WithResponse[events.APIGatewayProxyRequest, events.APIGatewayProxyResponse] {
@@ -48,10 +49,15 @@ func NewAPIGatewayV1(tracer trace.Tracer, meter metric.Meter) awsmiddleware.With
 		metric.WithDescription("Duration of Lambda handler invocations in milliseconds"),
 		metric.WithUnit("ms"),
 	)
+	var metricFlush func(context.Context) error
+	if fp, ok := otel.GetMeterProvider().(interface{ ForceFlush(context.Context) error }); ok {
+		metricFlush = fp.ForceFlush
+	}
 	return &apiGatewayV1SpanMiddleware{
 		tracer:      tracer,
 		invocations: invocations,
 		duration:    duration,
+		metricFlush: metricFlush,
 	}
 }
 
@@ -59,6 +65,7 @@ type apiGatewayV1SpanMiddleware struct {
 	tracer      trace.Tracer
 	invocations metric.Int64Counter
 	duration    metric.Float64Histogram
+	metricFlush func(context.Context) error
 }
 
 func (m *apiGatewayV1SpanMiddleware) Wrap(
@@ -103,6 +110,10 @@ func (m *apiGatewayV1SpanMiddleware) Wrap(
 		m.invocations.Add(ctx, 1, attrs)
 		m.duration.Record(ctx, float64(time.Since(start).Milliseconds()), attrs)
 
+		if m.metricFlush != nil {
+			_ = m.metricFlush(ctx)
+		}
+
 		return resp, err
 	}
 }
@@ -120,11 +131,16 @@ func NewNoResponse[E any](tracer trace.Tracer, meter metric.Meter, spanName stri
 		metric.WithDescription("Duration of Lambda handler invocations in milliseconds"),
 		metric.WithUnit("ms"),
 	)
+	var metricFlush func(context.Context) error
+	if fp, ok := otel.GetMeterProvider().(interface{ ForceFlush(context.Context) error }); ok {
+		metricFlush = fp.ForceFlush
+	}
 	return &noResponseSpanMiddleware[E]{
 		tracer:      tracer,
 		spanName:    spanName,
 		invocations: invocations,
 		duration:    duration,
+		metricFlush: metricFlush,
 	}
 }
 
@@ -133,6 +149,7 @@ type noResponseSpanMiddleware[E any] struct {
 	spanName    string
 	invocations metric.Int64Counter
 	duration    metric.Float64Histogram
+	metricFlush func(context.Context) error
 }
 
 func (m *noResponseSpanMiddleware[E]) Wrap(
@@ -164,6 +181,10 @@ func (m *noResponseSpanMiddleware[E]) Wrap(
 		)
 		m.invocations.Add(ctx, 1, attrs)
 		m.duration.Record(ctx, float64(time.Since(start).Milliseconds()), attrs)
+
+		if m.metricFlush != nil {
+			_ = m.metricFlush(ctx)
+		}
 
 		return err
 	}

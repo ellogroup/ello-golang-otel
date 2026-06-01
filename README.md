@@ -21,12 +21,22 @@ When `OTEL_ENABLED` is `false`, all providers return no-op implementations with 
 
 ### Tracer
 
-Creates and globally registers a TracerProvider. Returns a `trace.Tracer` scoped to the service and a shutdown
-function to call on Lambda shutdown.
+Two constructors are provided depending on the runtime:
+
+**`NewTracerProvider`** — for long-running services. Spans are batched and exported in the background for efficiency.
+
+**`NewLambdaTracerProvider`** — for AWS Lambda. Spans are exported synchronously on `span.End()`, ensuring
+delivery to the OTLP endpoint (e.g. the ADOT sidecar) before the Lambda container is frozen between invocations.
 
 ```go
 cfg := config.NewFromEnv()
+
+// Long-running service
 tracer, shutdown, err := provider.NewTracerProvider(ctx, cfg)
+
+// Lambda
+tracer, shutdown, err := provider.NewLambdaTracerProvider(ctx, cfg)
+
 if err != nil {
     // handle error
 }
