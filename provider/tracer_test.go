@@ -19,3 +19,14 @@ func TestNewTracerProvider_Disabled(t *testing.T) {
 	assert.NotNil(t, shutdown)
 	assert.NoError(t, shutdown(context.Background()))
 }
+
+func TestNewLambdaTracerProvider_Disabled(t *testing.T) {
+	cfg := config.Config{Enabled: false, ServiceName: "test-service"}
+
+	tracer, shutdown, err := provider.NewLambdaTracerProvider(context.Background(), cfg)
+
+	require.NoError(t, err)
+	assert.NotNil(t, tracer)
+	assert.NotNil(t, shutdown)
+	assert.NoError(t, shutdown(context.Background()))
+}
