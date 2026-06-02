@@ -21,21 +21,27 @@ When `OTEL_ENABLED` is `false`, all providers return no-op implementations with 
 
 ### Tracer
 
-Two constructors are provided depending on the runtime:
+`NewTracerProvider` accepts functional options to configure export and propagation behaviour:
 
-**`NewTracerProvider`** — for long-running services. Spans are batched and exported in the background for efficiency.
+| Option | Effect |
+|---|---|
+| `WithLambda()` | Synchronous export via `SimpleSpanProcessor` — spans are delivered before the Lambda container is frozen |
+| `WithXRay()` | X-Ray ID generator (timestamp-prefixed trace IDs required by ADOT) + X-Ray propagator for `X-Amzn-Trace-Id` headers |
 
-**`NewLambdaTracerProvider`** — for AWS Lambda. Spans are exported synchronously on `span.End()`, ensuring
-delivery to the OTLP endpoint (e.g. the ADOT sidecar) before the Lambda container is frozen between invocations.
+`WithLambda` and `WithXRay` are independent: a Lambda may send to a non-X-Ray backend, and a non-Lambda service could use X-Ray.
 
 ```go
 cfg := config.NewFromEnv()
 
-// Long-running service
+// Long-running service, no options needed
 tracer, shutdown, err := provider.NewTracerProvider(ctx, cfg)
 
-// Lambda
+// Lambda sending to a non-X-Ray backend
+tracer, shutdown, err := provider.NewTracerProvider(ctx, cfg, provider.WithLambda())
+
+// Lambda with ADOT/X-Ray (convenience wrapper for the common Ello case)
 tracer, shutdown, err := provider.NewLambdaTracerProvider(ctx, cfg)
+// equivalent to: provider.NewTracerProvider(ctx, cfg, provider.WithLambda(), provider.WithXRay())
 
 if err != nil {
     // handle error
@@ -43,8 +49,9 @@ if err != nil {
 defer shutdown(ctx)
 ```
 
-W3C TraceContext and Baggage propagators are always registered globally, enabling trace context extraction
-even when OTEL is disabled.
+W3C TraceContext and Baggage propagators are always registered globally; `WithXRay` additionally registers
+the X-Ray propagator. All propagators are registered even when `OTEL_ENABLED=false` so context extraction
+works in the disabled case.
 
 Sampling uses a parent-based strategy: if an upstream service sampled the trace, the decision is inherited.
 The local rate is controlled by `OTEL_SAMPLE_RATE`.

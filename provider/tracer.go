@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/ellogroup/ello-golang-otel/config"
+	"go.opentelemetry.io/contrib/propagators/aws/xray"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/propagation"
@@ -14,33 +15,57 @@ import (
 	"go.opentelemetry.io/otel/trace/noop"
 )
 
+// Option configures the TracerProvider.
+type Option func(*tracerOptions)
+
+type tracerOptions struct {
+	lambda bool
+	xray   bool
+}
+
+// WithLambda configures synchronous span export via SimpleSpanProcessor so spans are
+// delivered to the OTLP endpoint before the Lambda container is frozen between invocations.
+func WithLambda() Option {
+	return func(o *tracerOptions) { o.lambda = true }
+}
+
+// WithXRay configures X-Ray compatibility: uses the X-Ray ID generator (trace IDs contain
+// a valid Unix timestamp prefix required by ADOT when converting OTLP to X-Ray segments)
+// and registers the X-Ray propagator so X-Amzn-Trace-Id headers are extracted as parent context.
+func WithXRay() Option {
+	return func(o *tracerOptions) { o.xray = true }
+}
+
 // NewTracerProvider creates and registers a global TracerProvider configured from cfg.
-// Spans are batched and exported in the background — suitable for long-running services.
-// For Lambda, use NewLambdaTracerProvider instead.
+// Use WithLambda() for Lambda execution environments and WithXRay() when sending to AWS X-Ray via ADOT.
 //
 // Returns a Tracer scoped to cfg.ServiceName and a shutdown function to flush on exit.
 // When cfg.Enabled is false a no-op tracer is returned with zero overhead.
-// W3C TraceContext and Baggage propagators are always registered globally.
-func NewTracerProvider(ctx context.Context, cfg config.Config) (trace.Tracer, func(context.Context) error, error) {
-	return newTracerProvider(ctx, cfg, false)
+// W3C TraceContext and Baggage propagators are always registered globally; WithXRay also adds
+// the X-Ray propagator.
+func NewTracerProvider(ctx context.Context, cfg config.Config, opts ...Option) (trace.Tracer, func(context.Context) error, error) {
+	o := &tracerOptions{}
+	for _, opt := range opts {
+		opt(o)
+	}
+	return newTracerProvider(ctx, cfg, o)
 }
 
-// NewLambdaTracerProvider creates and registers a global TracerProvider configured from cfg.
-// Spans are exported synchronously on span.End(), ensuring delivery to the OTLP endpoint
-// before the Lambda container is frozen between invocations.
-//
-// Returns a Tracer scoped to cfg.ServiceName and a shutdown function to call on SIGTERM.
-// When cfg.Enabled is false a no-op tracer is returned with zero overhead.
-// W3C TraceContext and Baggage propagators are always registered globally.
+// NewLambdaTracerProvider is a convenience wrapper for Lambda functions sending traces to AWS
+// X-Ray via ADOT. It is equivalent to NewTracerProvider(ctx, cfg, WithLambda(), WithXRay()).
 func NewLambdaTracerProvider(ctx context.Context, cfg config.Config) (trace.Tracer, func(context.Context) error, error) {
-	return newTracerProvider(ctx, cfg, true)
+	return NewTracerProvider(ctx, cfg, WithLambda(), WithXRay())
 }
 
-func newTracerProvider(ctx context.Context, cfg config.Config, lambda bool) (trace.Tracer, func(context.Context) error, error) {
-	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
-		propagation.TraceContext{},
+func newTracerProvider(ctx context.Context, cfg config.Config, o *tracerOptions) (trace.Tracer, func(context.Context) error, error) {
+	propagators := []propagation.TextMapPropagator{
 		propagation.Baggage{},
-	))
+		propagation.TraceContext{},
+	}
+	if o.xray {
+		propagators = append(propagators, xray.Propagator{})
+	}
+	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagators...))
 
 	if !cfg.Enabled {
 		return noop.NewTracerProvider().Tracer(cfg.ServiceName), func(context.Context) error { return nil }, nil
@@ -72,18 +97,22 @@ func newTracerProvider(ctx context.Context, cfg config.Config, lambda bool) (tra
 	}
 
 	var processor sdktrace.SpanProcessor
-	if lambda {
+	if o.lambda {
 		processor = sdktrace.NewSimpleSpanProcessor(exp)
 	} else {
 		processor = sdktrace.NewBatchSpanProcessor(exp)
 	}
 
-	tp := sdktrace.NewTracerProvider(
+	tpOpts := []sdktrace.TracerProviderOption{
 		sdktrace.WithSpanProcessor(processor),
 		sdktrace.WithResource(res),
 		sdktrace.WithSampler(sdktrace.ParentBased(sampler)),
-	)
+	}
+	if o.xray {
+		tpOpts = append(tpOpts, sdktrace.WithIDGenerator(xray.NewIDGenerator()))
+	}
 
+	tp := sdktrace.NewTracerProvider(tpOpts...)
 	otel.SetTracerProvider(tp)
 
 	return tp.Tracer(cfg.ServiceName), tp.Shutdown, nil
