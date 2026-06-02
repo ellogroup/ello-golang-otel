@@ -14,6 +14,7 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 	"go.opentelemetry.io/otel/trace"
+	"net/http"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -75,9 +76,10 @@ func (m *apiGatewayV1SpanMiddleware) Wrap(
 		start := time.Now()
 		isColdStart := isColdStart()
 
-		// Extract W3C trace context from incoming API Gateway headers.
-		// Headers are normalised to lowercase because the W3C spec and HTTP/2 use lowercase.
-		carrier := propagation.MapCarrier(lowercaseHeaders(event.Headers))
+		// Extract trace context from incoming API Gateway headers.
+		// HeaderCarrier uses http.Header's case-insensitive lookup, which is required for
+		// the X-Ray propagator (X-Amzn-Trace-Id) alongside W3C traceparent/tracestate.
+		carrier := propagation.HeaderCarrier(headersToHTTP(event.Headers))
 		ctx = otel.GetTextMapPropagator().Extract(ctx, carrier)
 
 		spanName := event.RequestContext.HTTPMethod + " " + event.RequestContext.Path
@@ -190,14 +192,16 @@ func (m *noResponseSpanMiddleware[E]) Wrap(
 	}
 }
 
-// lowercaseHeaders returns a copy of headers with all keys lowercased.
-// API Gateway may preserve the original casing from the client; W3C headers are case-insensitive.
-func lowercaseHeaders(headers map[string]string) map[string]string {
-	out := make(map[string]string, len(headers))
+// headersToHTTP converts an API Gateway header map to http.Header, normalising keys to
+// canonical MIME form (e.g. "x-amzn-trace-id" → "X-Amzn-Trace-Id") so that
+// propagation.HeaderCarrier lookups are case-insensitive regardless of what casing
+// API Gateway or the client used.
+func headersToHTTP(headers map[string]string) http.Header {
+	h := make(http.Header, len(headers))
 	for k, v := range headers {
-		out[strings.ToLower(k)] = v
+		h.Set(k, v)
 	}
-	return out
+	return h
 }
 
 // lambdaFunctionName returns the Lambda function name from context, or "lambda" as fallback.
