@@ -1,5 +1,4 @@
 DOCKER_IMG_TAGGED = ellogroup/ello-golang-otel:latest
-DOCKER_RUN = docker run --rm --platform linux/amd64 $(DOCKER_IMG_TAGGED)
 DOCKER_RUN_SRC = docker run --rm --platform linux/amd64 -v $(CURDIR):/src/app $(DOCKER_IMG_TAGGED)
 
 .PHONY: build-format-test
@@ -56,11 +55,11 @@ test: static-tests unit-tests
 
 .PHONY: static-tests
 static-tests:
-	$(DOCKER_RUN) golangci-lint config verify
-	$(DOCKER_RUN) golangci-lint run -v
-	$(DOCKER_RUN) gosec ./...
-	$(DOCKER_RUN) govulncheck ./...
+	$(DOCKER_RUN_SRC) golangci-lint config verify
+	$(DOCKER_RUN_SRC) golangci-lint run -v
+	$(DOCKER_RUN_SRC) gosec ./...
+	$(DOCKER_RUN_SRC) govulncheck ./...
 
 .PHONY: unit-tests
 unit-tests:
-	$(DOCKER_RUN) go test -v -cover ./...
+	$(DOCKER_RUN_SRC) go test -v -cover ./...
