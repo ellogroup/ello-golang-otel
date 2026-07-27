@@ -30,12 +30,14 @@ func (m *MockHandler) Handle(ctx context.Context, r slog.Record) error {
 
 func (m *MockHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	args := m.Called(attrs)
-	return args.Get(0).(slog.Handler)
+	h, _ := args.Get(0).(slog.Handler)
+	return h
 }
 
 func (m *MockHandler) WithGroup(name string) slog.Handler {
 	args := m.Called(name)
-	return args.Get(0).(slog.Handler)
+	h, _ := args.Get(0).(slog.Handler)
+	return h
 }
 
 func TestHandle_WithValidSpan_AddsTraceAttributes(t *testing.T) {
