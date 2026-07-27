@@ -4,9 +4,14 @@ package middleware
 
 import (
 	"context"
+	"net/http"
+	"strconv"
+	"strings"
+	"sync/atomic"
+	"time"
+
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambdacontext"
-	awsmiddleware "github.com/ellogroup/ello-golang-aws/lambda/middleware"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -14,11 +19,8 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 	"go.opentelemetry.io/otel/trace"
-	"net/http"
-	"strconv"
-	"strings"
-	"sync/atomic"
-	"time"
+
+	awsmiddleware "github.com/ellogroup/ello-golang-aws/lambda/middleware"
 )
 
 // warmedUp tracks whether this execution environment has handled at least one invocation.

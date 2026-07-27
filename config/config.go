@@ -1,8 +1,9 @@
 package config
 
 import (
-	dflt "github.com/ellogroup/ello-golang-otel/internal/default"
 	"os"
+
+	dflt "github.com/ellogroup/ello-golang-otel/internal/default"
 )
 
 // Config holds the OpenTelemetry configuration read from environment variables.

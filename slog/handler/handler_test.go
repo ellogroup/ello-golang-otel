@@ -2,14 +2,16 @@ package handler_test
 
 import (
 	"context"
-	"github.com/ellogroup/ello-golang-otel/slog/handler"
+	"log/slog"
+	"testing"
+	"time"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	"log/slog"
-	"testing"
-	"time"
+
+	"github.com/ellogroup/ello-golang-otel/slog/handler"
 )
 
 type MockHandler struct {

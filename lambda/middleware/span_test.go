@@ -3,6 +3,8 @@ package middleware
 import (
 	"context"
 	"errors"
+	"testing"
+
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -12,7 +14,6 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
-	"testing"
 )
 
 func setupTestMeter(t *testing.T) (*sdkmetric.ManualReader, metric.Meter) {

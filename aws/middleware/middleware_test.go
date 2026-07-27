@@ -1,10 +1,12 @@
 package middleware_test
 
 import (
-	"github.com/aws/aws-sdk-go-v2/aws"
-	awsmiddleware "github.com/ellogroup/ello-golang-otel/aws/middleware"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/stretchr/testify/assert"
+
+	awsmiddleware "github.com/ellogroup/ello-golang-otel/aws/middleware"
 )
 
 func TestAppendToConfig_AddsMiddlewares(t *testing.T) {

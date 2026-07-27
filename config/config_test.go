@@ -1,9 +1,11 @@
 package config_test
 
 import (
-	"github.com/ellogroup/ello-golang-otel/config"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/ellogroup/ello-golang-otel/config"
 )
 
 func TestNewFromEnv(t *testing.T) {
