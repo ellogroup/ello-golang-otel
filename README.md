@@ -164,3 +164,42 @@ client := &http.Client{
 
 The global TracerProvider (set by `provider.NewTracerProvider`) is used automatically. When OTEL is disabled
 the transport is safe to use with zero overhead.
+
+## Development
+
+### AI-agent context
+
+This repository carries shared AI-agent context and tooling used across Ello repositories:
+
+- `AGENTS.md` — repository-specific agent context (read this first).
+- `.ai-context/` — a git submodule of shared, cross-repo standards, conventions, and skills.
+- `CLAUDE.md` — a thin Claude Code-specific pointer into the two files above.
+
+`.ai-context/` is auto-initialised by `make build` when missing (skipped in CI, which does not need AI-agent
+context to build or test). To pull the latest shared standards and regenerate Claude Code skill wrappers:
+
+```bash
+make sync-ai-context   # updates the .ai-context submodule pointer, then runs sync-skills
+make init-memory       # seeds .agents/memory/{progress,decisions,notes,techdebt}.md (idempotent)
+```
+
+### Commands
+
+Docker-based (matches CI exactly — requires Docker):
+
+```bash
+make build            # build Docker image, go mod tidy, ensure .ai-context is initialised
+make format            # gofmt, go fix, goimports (local prefix github.com/ellogroup)
+make test              # static-tests + unit-tests
+make static-tests      # golangci-lint (config verify + run), gosec, govulncheck
+make unit-tests        # go test -v -cover ./...
+make build-format-test # build + format + test
+```
+
+Local (no Docker):
+
+```bash
+go test -v -cover ./...
+go vet ./...
+go mod tidy
+```

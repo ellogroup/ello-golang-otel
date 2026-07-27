@@ -2,11 +2,13 @@ package provider_test
 
 import (
 	"context"
-	"github.com/ellogroup/ello-golang-otel/config"
-	"github.com/ellogroup/ello-golang-otel/provider"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
+
+	"github.com/ellogroup/ello-golang-otel/config"
+	"github.com/ellogroup/ello-golang-otel/provider"
 )
 
 func TestNewTracerProvider_Disabled(t *testing.T) {

@@ -2,14 +2,16 @@ package handler_test
 
 import (
 	"context"
-	"github.com/ellogroup/ello-golang-otel/slog/handler"
+	"log/slog"
+	"testing"
+	"time"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	"log/slog"
-	"testing"
-	"time"
+
+	"github.com/ellogroup/ello-golang-otel/slog/handler"
 )
 
 type MockHandler struct {
@@ -28,12 +30,14 @@ func (m *MockHandler) Handle(ctx context.Context, r slog.Record) error {
 
 func (m *MockHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	args := m.Called(attrs)
-	return args.Get(0).(slog.Handler)
+	h, _ := args.Get(0).(slog.Handler)
+	return h
 }
 
 func (m *MockHandler) WithGroup(name string) slog.Handler {
 	args := m.Called(name)
-	return args.Get(0).(slog.Handler)
+	h, _ := args.Get(0).(slog.Handler)
+	return h
 }
 
 func TestHandle_WithValidSpan_AddsTraceAttributes(t *testing.T) {

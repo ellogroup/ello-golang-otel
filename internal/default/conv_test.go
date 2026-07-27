@@ -1,8 +1,9 @@
 package dflt
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestStrToBoolOrDefault(t *testing.T) {
