@@ -52,14 +52,15 @@ application repository shape do not hold here:
 
 ### Package architecture
 
-Five packages with a clear dependency hierarchy, plus one internal helper
+Six packages with a clear dependency hierarchy, plus one internal helper
 package:
 
 | Package | Purpose |
 |---|---|
 | `config/` | Reads all OTEL configuration from environment variables via `config.NewFromEnv()`. Key env vars: `OTEL_ENABLED`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`, `OTEL_SERVICE_VERSION`, `ENVIRONMENT`, `OTEL_SAMPLE_RATE`. |
-| `provider/` | Creates and globally registers OTEL providers: `NewTracerProvider(ctx, cfg)` and `NewMeterProvider(ctx, cfg)`, each returning a provider + shutdown func. When `OTEL_ENABLED=false`, both return no-op providers with zero overhead. Both always register W3C TraceContext and Baggage propagators globally. |
-| `lambda/middleware/` | AWS Lambda middleware that wraps handlers and instruments them: `NewAPIGatewayV1(tracer)` for API Gateway v1 HTTP handlers (extracts W3C trace context from request headers, creates server spans, sets Error on 5xx or handler errors); `NewNoResponse(tracer)` for event-driven handlers (SQS, SNS, scheduled events) with no response instrumentation. |
+| `provider/` | Creates and globally registers OTEL providers: `NewTracerProvider(ctx, cfg, ...opts)` (with `WithLambda()` / `WithXRay()` options, plus the `NewLambdaTracerProvider(ctx, cfg)` convenience wrapper) and `NewMeterProvider(ctx, cfg)`, each returning a provider + shutdown func. When `OTEL_ENABLED=false`, both return no-op providers with zero overhead. Both always register W3C TraceContext and Baggage propagators globally. |
+| `lambda/middleware/` | AWS Lambda middleware that wraps handlers and instruments them: `NewAPIGatewayV1(tracer, meter)` for API Gateway v1 HTTP handlers (extracts W3C trace context from request headers, creates server spans, sets Error on 5xx or handler errors); `NewNoResponse[E any](tracer, meter, spanName)` for event-driven handlers (SQS, SNS, scheduled events) with no response instrumentation. |
+| `aws/middleware/` | `AppendToConfig(cfg *aws.Config)` instruments all AWS SDK v2 calls with OTel client spans (service, operation, region, request ID attributes) via the `otelaws` contrib package. Do not also wrap the AWS HTTP transport with `http/transport.New` — double-wrapping creates duplicate spans. |
 | `slog/handler/` | `New(inner slog.Handler)` wraps any `slog.Handler` to inject `trace_id` and `span_id` from the active OTEL span into every log record. No-op when OTEL is disabled. |
 | `http/transport/` | `New(base RoundTripper)` wraps an HTTP client's transport with OTEL instrumentation: creates child spans, injects W3C `traceparent`/`tracestate` headers for downstream propagation, and records HTTP attributes. |
 | `internal/default/` | Private helpers for parsing env vars with defaults: `StrToBoolOrDefault`, `StrToFloat64OrDefault`, `NonEmptyOrDefault`. |
@@ -87,7 +88,7 @@ package architecture.
 | Concern | Where to look |
 |---|---|
 | Local commands | `Makefile`, `README.md` |
-| Library code | `config/`, `provider/`, `lambda/middleware/`, `slog/handler/`, `http/transport/`, `internal/default/` |
+| Library code | `config/`, `provider/`, `lambda/middleware/`, `aws/middleware/`, `slog/handler/`, `http/transport/`, `internal/default/` |
 | Unit tests | Alongside each package (`*_test.go`) — no separate test module |
 | Session memory / handoff notes | `.agents/memory/` |
 
