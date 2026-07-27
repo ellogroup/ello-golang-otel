@@ -6,7 +6,7 @@ DOCKER_RUN_SRC = docker run --rm --platform linux/amd64 -v $(CURDIR):/src/app $(
 build-format-test: build format test
 
 .PHONY: build
-build:
+build: ensure-ai-context
 	docker build --platform linux/amd64 -t $(DOCKER_IMG_TAGGED) .
 	$(DOCKER_RUN_SRC) go mod tidy
 
@@ -49,12 +49,14 @@ init-memory: ensure-ai-context
 format:
 	$(DOCKER_RUN_SRC) gofmt -w ./
 	$(DOCKER_RUN_SRC) go fix ./...
+	$(DOCKER_RUN_SRC) goimports -local github.com/ellogroup -w ./
 
 .PHONY: test
 test: static-tests unit-tests
 
 .PHONY: static-tests
 static-tests:
+	$(DOCKER_RUN) golangci-lint config verify
 	$(DOCKER_RUN) golangci-lint run -v
 	$(DOCKER_RUN) gosec ./...
 	$(DOCKER_RUN) govulncheck ./...
