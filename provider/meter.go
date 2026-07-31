@@ -27,8 +27,14 @@ func NewMeterProvider(ctx context.Context, cfg config.Config) (metric.Meter, fun
 		return metricnoop.NewMeterProvider().Meter(cfg.ServiceName), func(context.Context) error { return nil }, nil
 	}
 
+	// Delta temporality: Lambda execution environments are short-lived and recycled
+	// unpredictably, so a cumulative Sum's first data point for any given attribute set
+	// is always dropped by awsemf (it has no prior value to diff against, and low-traffic
+	// Lambdas rarely see a second matching data point before the container recycles).
+	// Delta values are self-contained per export and need no cross-export diffing.
 	exp, err := otlpmetrichttp.New(ctx,
 		otlpmetrichttp.WithEndpointURL(cfg.Endpoint),
+		otlpmetrichttp.WithTemporalitySelector(sdkmetric.LowMemoryTemporalitySelector),
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("creating OTLP metric exporter: %w", err)
