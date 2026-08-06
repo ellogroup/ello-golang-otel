@@ -13,7 +13,8 @@ type Config struct {
 	Enabled bool
 
 	// Endpoint is the OTLP HTTP exporter endpoint (e.g. "http://jaeger:4318").
-	// Must not include a path — the exporter appends /v1/traces and /v1/metrics automatically.
+	// When left without a path, the exporter appends /v1/traces and /v1/metrics
+	// automatically. To target the literal root instead, include a trailing "/".
 	Endpoint string
 
 	// ServiceName is the logical name of the service reported to the OTEL backend.

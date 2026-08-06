@@ -73,8 +73,13 @@ func newTracerProvider(ctx context.Context, cfg config.Config, o *tracerOptions)
 		return noop.NewTracerProvider().Tracer(cfg.ServiceName), func(context.Context) error { return nil }, nil
 	}
 
+	endpoint, err := resolveSignalEndpoint(cfg.Endpoint, "v1/traces")
+	if err != nil {
+		return nil, nil, fmt.Errorf("resolving OTLP trace endpoint: %w", err)
+	}
+
 	exp, err := otlptracehttp.New(ctx,
-		otlptracehttp.WithEndpointURL(cfg.Endpoint),
+		otlptracehttp.WithEndpointURL(endpoint),
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("creating OTLP trace exporter: %w", err)

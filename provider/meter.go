@@ -32,8 +32,13 @@ func NewMeterProvider(ctx context.Context, cfg config.Config) (metric.Meter, fun
 	// is always dropped by awsemf (it has no prior value to diff against, and low-traffic
 	// Lambdas rarely see a second matching data point before the container recycles).
 	// Delta values are self-contained per export and need no cross-export diffing.
+	endpoint, err := resolveSignalEndpoint(cfg.Endpoint, "v1/metrics")
+	if err != nil {
+		return nil, nil, fmt.Errorf("resolving OTLP metric endpoint: %w", err)
+	}
+
 	exp, err := otlpmetrichttp.New(ctx,
-		otlpmetrichttp.WithEndpointURL(cfg.Endpoint),
+		otlpmetrichttp.WithEndpointURL(endpoint),
 		otlpmetrichttp.WithTemporalitySelector(sdkmetric.LowMemoryTemporalitySelector),
 	)
 	if err != nil {
