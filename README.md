@@ -17,6 +17,10 @@ Configuration is read from environment variables using `config.NewFromEnv()`.
 
 When `OTEL_ENABLED` is `false`, all providers return no-op implementations with zero overhead.
 
+`OTEL_EXPORTER_OTLP_ENDPOINT` is normally left path-less — the trace and metric
+exporters append `/v1/traces` and `/v1/metrics` respectively. To target the
+literal root instead, add a trailing `/` (e.g. `http://jaeger:4318/`).
+
 ## Provider
 
 ### Tracer
