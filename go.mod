@@ -1,6 +1,6 @@
 module github.com/ellogroup/ello-golang-otel
 
-go 1.26.5
+go 1.26.6
 
 require (
 	github.com/aws/aws-lambda-go v1.55.0
