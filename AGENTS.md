@@ -100,7 +100,7 @@ switch back:**
    [#5547](https://github.com/open-telemetry/opentelemetry-go-contrib/issues/5547) and the module's
    `CHANGELOG.md` for a new owner or an AWS-maintained replacement.
 3. If maintained again: remove the local copy, import upstream (`internal/xray` → provider import;
-   `aws/middleware` → `otelaws.AppendMiddlewares(&cfg.APIOptions)` or a thin wrapper), `go mod tidy`,
+   `aws/middleware` → `otelaws.AppendMiddlewares(&cfg.APIOptions)` or a thin wrapper; note this brings back the per-service attributes and options we did not port and changes the instrumentation scope name, so call it out as a telemetry change), `go mod tidy`,
    and update the package table above, add a superseding ADR, and update the TD entry in
    `.agents/memory/techdebt.md`.
 4. If not, leave it and record the date checked in the TD entry.

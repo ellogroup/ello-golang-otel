@@ -72,3 +72,24 @@ func TestAppendToConfig_CreatesSpanAndInjectsTraceContext(t *testing.T) {
 	require.NotNil(t, stub.got)
 	assert.Contains(t, stub.got.Header.Get("traceparent"), spans[0].SpanContext().TraceID().String())
 }
+
+func TestAppendToConfig_Idempotent(t *testing.T) {
+	rec := setup(t)
+	cfg := aws.Config{Region: "eu-west-2", Credentials: aws.AnonymousCredentials{}, HTTPClient: &stubHTTP{}}
+	awsmiddleware.AppendToConfig(&cfg)
+	awsmiddleware.AppendToConfig(&cfg)
+
+	_, err := sqs.NewFromConfig(cfg).ListQueues(context.Background(), &sqs.ListQueuesInput{})
+	require.NoError(t, err)
+	assert.Len(t, rec.Ended(), 1)
+}
+
+func TestAppendToConfig_ResolvesGlobalsLazily(t *testing.T) {
+	cfg := aws.Config{Region: "eu-west-2", Credentials: aws.AnonymousCredentials{}, HTTPClient: &stubHTTP{}}
+	awsmiddleware.AppendToConfig(&cfg) // before the provider is registered
+
+	rec := setup(t)
+	_, err := sqs.NewFromConfig(cfg).ListQueues(context.Background(), &sqs.ListQueuesInput{})
+	require.NoError(t, err)
+	assert.Len(t, rec.Ended(), 1)
+}

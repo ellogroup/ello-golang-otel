@@ -92,8 +92,6 @@ memory or an outdated local note should be pointed at this ADR.
 
 ---
 
----
-
 ### ADR-002 — Remove deprecated otelaws / propagators/aws contrib modules
 
 **Date:** 2026-11-17

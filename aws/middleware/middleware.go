@@ -45,10 +45,12 @@ const (
 
 type startTimeKey struct{}
 
-type otelMiddlewares struct {
-	tracer     trace.Tracer
-	propagator propagation.TextMapPropagator
-}
+const (
+	initializeBeforeID = "OTelInitializeMiddlewareBefore"
+	initializeAfterID  = "OTelInitializeMiddlewareAfter"
+	finalizeID         = "OTelFinalizeMiddleware"
+	deserializeID      = "OTelDeserializeMiddleware"
+)
 
 // AppendToConfig attaches OTel instrumentation middleware to an existing aws.Config.
 // It mutates cfg.APIOptions in-place, adding SDK middleware steps that:
@@ -57,21 +59,25 @@ type otelMiddlewares struct {
 //   - Inject trace context into outgoing HTTP request headers
 //   - Set span error status on failed calls
 //
-// The global TracerProvider and TextMapPropagator are used (registered by provider.NewTracerProvider).
-// When OTEL is disabled the global provider is a no-op so spans are zero-overhead.
+// The global TracerProvider and TextMapPropagator are resolved on each call, so it does not matter
+// whether AppendToConfig runs before or after provider.NewTracerProvider. When OTEL is disabled the
+// global provider is a no-op so spans are zero-overhead.
+//
+// AppendToConfig is idempotent: calling it more than once on the same config does not add the
+// middleware twice. Note that all headers produced by the global propagator (including W3C baggage,
+// if set) are sent to AWS endpoints, so do not put sensitive data in baggage.
 //
 // Do NOT also wrap the AWS HTTP transport with oteltransport.New — this middleware already
 // injects trace context; double-wrapping creates duplicate spans.
 func AppendToConfig(cfg *aws.Config) {
-	m := otelMiddlewares{
-		tracer:     otel.GetTracerProvider().Tracer(ScopeName),
-		propagator: otel.GetTextMapPropagator(),
-	}
-	cfg.APIOptions = append(cfg.APIOptions, m.initializeBefore, m.initializeAfter, m.finalize, m.deserialize)
+	cfg.APIOptions = append(cfg.APIOptions, initializeBefore, initializeAfter, finalize, deserialize)
 }
 
-func (otelMiddlewares) initializeBefore(stack *middleware.Stack) error {
-	return stack.Initialize.Add(middleware.InitializeMiddlewareFunc("OTelInitializeMiddlewareBefore", func(
+func initializeBefore(stack *middleware.Stack) error {
+	if _, ok := stack.Initialize.Get(initializeBeforeID); ok {
+		return nil
+	}
+	return stack.Initialize.Add(middleware.InitializeMiddlewareFunc(initializeBeforeID, func(
 		ctx context.Context, in middleware.InitializeInput, next middleware.InitializeHandler,
 	) (middleware.InitializeOutput, middleware.Metadata, error) {
 		ctx = context.WithValue(ctx, startTimeKey{}, time.Now())
@@ -79,8 +85,11 @@ func (otelMiddlewares) initializeBefore(stack *middleware.Stack) error {
 	}), middleware.Before)
 }
 
-func (m otelMiddlewares) initializeAfter(stack *middleware.Stack) error {
-	return stack.Initialize.Add(middleware.InitializeMiddlewareFunc("OTelInitializeMiddlewareAfter", func(
+func initializeAfter(stack *middleware.Stack) error {
+	if _, ok := stack.Initialize.Get(initializeAfterID); ok {
+		return nil
+	}
+	return stack.Initialize.Add(middleware.InitializeMiddlewareFunc(initializeAfterID, func(
 		ctx context.Context, in middleware.InitializeInput, next middleware.InitializeHandler,
 	) (middleware.InitializeOutput, middleware.Metadata, error) {
 		serviceID := awsmiddleware.GetServiceID(ctx)
@@ -98,7 +107,7 @@ func (m otelMiddlewares) initializeAfter(stack *middleware.Stack) error {
 			startOpts = append(startOpts, trace.WithTimestamp(t))
 		}
 
-		ctx, span := m.tracer.Start(ctx, spanName(serviceID, operation), startOpts...)
+		ctx, span := otel.GetTracerProvider().Tracer(ScopeName).Start(ctx, spanName(serviceID, operation), startOpts...)
 		defer span.End()
 
 		out, md, err := next.HandleInitialize(ctx, in)
@@ -110,19 +119,25 @@ func (m otelMiddlewares) initializeAfter(stack *middleware.Stack) error {
 	}), middleware.After)
 }
 
-func (m otelMiddlewares) finalize(stack *middleware.Stack) error {
-	return stack.Finalize.Add(middleware.FinalizeMiddlewareFunc("OTelFinalizeMiddleware", func(
+func finalize(stack *middleware.Stack) error {
+	if _, ok := stack.Finalize.Get(finalizeID); ok {
+		return nil
+	}
+	return stack.Finalize.Add(middleware.FinalizeMiddlewareFunc(finalizeID, func(
 		ctx context.Context, in middleware.FinalizeInput, next middleware.FinalizeHandler,
 	) (middleware.FinalizeOutput, middleware.Metadata, error) {
 		if req, ok := in.Request.(*smithyhttp.Request); ok {
-			m.propagator.Inject(ctx, propagation.HeaderCarrier(req.Header))
+			otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
 		}
 		return next.HandleFinalize(ctx, in)
 	}), middleware.After)
 }
 
-func (otelMiddlewares) deserialize(stack *middleware.Stack) error {
-	return stack.Deserialize.Add(middleware.DeserializeMiddlewareFunc("OTelDeserializeMiddleware", func(
+func deserialize(stack *middleware.Stack) error {
+	if _, ok := stack.Deserialize.Get(deserializeID); ok {
+		return nil
+	}
+	return stack.Deserialize.Add(middleware.DeserializeMiddlewareFunc(deserializeID, func(
 		ctx context.Context, in middleware.DeserializeInput, next middleware.DeserializeHandler,
 	) (middleware.DeserializeOutput, middleware.Metadata, error) {
 		out, md, err := next.HandleDeserialize(ctx, in)
