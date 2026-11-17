@@ -1,0 +1,156 @@
+// Vendored from go.opentelemetry.io/contrib/propagators/aws/xray v1.47.0 (Apache-2.0),
+// which is deprecated upstream. Modified only by relocation into this module.
+
+// Copyright The OpenTelemetry Authors
+// SPDX-License-Identifier: Apache-2.0
+
+package xray
+
+import (
+	"bytes"
+	crand "crypto/rand"
+	"errors"
+	"strconv"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/trace"
+)
+
+func TestTraceIDIsValidLength(t *testing.T) {
+	idg := NewIDGenerator()
+	traceID, _ := idg.NewIDs(t.Context())
+
+	expectedTraceIDLength := 32
+	assert.Len(t, traceID.String(), expectedTraceIDLength, "TraceID has incorrect length.")
+}
+
+func TestTraceIDIsUnique(t *testing.T) {
+	idg := NewIDGenerator()
+	traceID1, _ := idg.NewIDs(t.Context())
+	traceID2, _ := idg.NewIDs(t.Context())
+
+	assert.NotEqual(t, traceID1.String(), traceID2.String(), "TraceID should be unique")
+}
+
+func TestTraceIDTimestampInBounds(t *testing.T) {
+	idg := NewIDGenerator()
+
+	previousTime := time.Now().Unix()
+
+	traceID, _ := idg.NewIDs(t.Context())
+
+	currentTime, err := strconv.ParseInt(traceID.String()[0:8], 16, 64)
+	require.NoError(t, err)
+
+	nextTime := time.Now().Unix()
+
+	assert.LessOrEqual(t, previousTime, currentTime, "TraceID is generated incorrectly with the wrong timestamp.")
+	assert.LessOrEqual(t, currentTime, nextTime, "TraceID is generated incorrectly with the wrong timestamp.")
+}
+
+func TestTraceIDIsNotNil(t *testing.T) {
+	var nilTraceID trace.TraceID
+	idg := NewIDGenerator()
+	traceID, _ := idg.NewIDs(t.Context())
+
+	assert.False(t, bytes.Equal(traceID[:], nilTraceID[:]), "TraceID cannot be empty.")
+}
+
+func TestSpanIDIsValidLength(t *testing.T) {
+	idg := NewIDGenerator()
+	ctx := t.Context()
+	traceID, spanID1 := idg.NewIDs(ctx)
+	spanID2 := idg.NewSpanID(t.Context(), traceID)
+	expectedSpanIDLength := 16
+
+	assert.Len(t, spanID1.String(), expectedSpanIDLength, "SpanID has incorrect length")
+	assert.Len(t, spanID2.String(), expectedSpanIDLength, "SpanID has incorrect length")
+}
+
+func TestSpanIDIsUnique(t *testing.T) {
+	idg := NewIDGenerator()
+	ctx := t.Context()
+	traceID, spanID1 := idg.NewIDs(ctx)
+	_, spanID2 := idg.NewIDs(ctx)
+
+	spanID3 := idg.NewSpanID(ctx, traceID)
+	spanID4 := idg.NewSpanID(ctx, traceID)
+
+	assert.NotEqual(t, spanID1.String(), spanID2.String(), "SpanID should be unique")
+	assert.NotEqual(t, spanID3.String(), spanID4.String(), "SpanID should be unique")
+}
+
+func TestSpanIDIsNotNil(t *testing.T) {
+	var nilSpanID trace.SpanID
+	idg := NewIDGenerator()
+	ctx := t.Context()
+	traceID, spanID1 := idg.NewIDs(ctx)
+	spanID2 := idg.NewSpanID(ctx, traceID)
+
+	assert.False(t, bytes.Equal(spanID1[:], nilSpanID[:]), "SpanID cannot be empty.")
+	assert.False(t, bytes.Equal(spanID2[:], nilSpanID[:]), "SpanID cannot be empty.")
+}
+
+// failingReader stands in for a crypto/rand.Reader that always errors.
+type failingReader struct{}
+
+func (failingReader) Read([]byte) (int, error) {
+	return 0, errors.New("read failed")
+}
+
+// TestIDGeneratorSeedReadFailure is the regression test for the bug this
+// package originally had: NewIDGenerator seeded a per-instance math/rand.Rand
+// from crypto/rand and discarded the read error, so a failing read left every
+// generator seeded with 0 and emitting an identical, predictable ID sequence.
+//
+// ID generation no longer consults crypto/rand at all, so independently
+// constructed generators must still diverge while that read would fail.
+func TestIDGeneratorSeedReadFailure(t *testing.T) {
+	orig := crand.Reader
+	t.Cleanup(func() { crand.Reader = orig })
+	crand.Reader = failingReader{}
+
+	ctx := t.Context()
+	traceID1, spanID1 := NewIDGenerator().NewIDs(ctx)
+	traceID2, spanID2 := NewIDGenerator().NewIDs(ctx)
+
+	assert.NotEqual(t, traceID1, traceID2, "TraceIDs must not repeat when the crypto/rand seed read fails")
+	assert.NotEqual(t, spanID1, spanID2, "SpanIDs must not repeat when the crypto/rand seed read fails")
+}
+
+// TestIDGeneratorLockUnlockCompat guards against removing the embedded
+// sync.Mutex, which is unused internally but kept so IDGenerator.Lock,
+// Unlock, and TryLock remain part of the public API for existing callers.
+func TestIDGeneratorLockUnlockCompat(t *testing.T) {
+	idg := NewIDGenerator()
+
+	idg.Lock()
+	stillLocked := !idg.TryLock()
+	idg.Unlock()
+
+	assert.True(t, stillLocked, "TryLock should fail while the mutex is held")
+}
+
+// TestIDGeneratorConcurrentUse guards against reintroducing a shared,
+// unsynchronized random source: IDGenerator no longer holds a mutex, so this
+// only stays safe as long as ID generation goes through math/rand/v2's
+// top-level functions, which are documented as safe for concurrent use.
+// Run with -race to catch a regression.
+func TestIDGeneratorConcurrentUse(t *testing.T) {
+	idg := NewIDGenerator()
+	ctx := t.Context()
+
+	var wg sync.WaitGroup
+	for range 50 {
+		wg.Go(func() {
+			traceID, spanID := idg.NewIDs(ctx)
+			_ = idg.NewSpanID(ctx, traceID)
+			_ = spanID
+		})
+	}
+	wg.Wait()
+}

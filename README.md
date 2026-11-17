@@ -115,9 +115,9 @@ Both middlewares record the following metrics on every invocation:
 
 ### Middleware
 
-Instruments all AWS SDK v2 calls with OpenTelemetry client spans. Each SDK call records `aws.service`,
-`aws.operation`, `aws.region`, and `aws.request_id` attributes, and propagates W3C trace context into
-outgoing HTTP request headers.
+Instruments all AWS SDK v2 calls with OpenTelemetry client spans. Each SDK call records `rpc.system.name`,
+`rpc.method`, `aws.region`, `aws.request_id` and `http.response.status_code` attributes, and injects trace
+context (via the global propagator) into outgoing HTTP request headers.
 
 Call `AppendToConfig` once after building your `aws.Config`:
 
@@ -132,8 +132,11 @@ awsmiddleware.AppendToConfig(&cfg)
 The global TracerProvider (set by `provider.NewTracerProvider`) is used automatically. When OTEL is
 disabled the global provider is a no-op so spans are zero-overhead.
 
-Do **not** also wrap the AWS HTTP transport with `http/transport.New` — `otelaws` handles trace
-propagation at the SDK middleware layer; double-wrapping creates duplicate spans.
+This is a port of the core of the upstream `otelaws` contrib module, which is deprecated (abandoned).
+Service-specific attributes (DynamoDB table, SQS queue URL, S3 bucket, SNS topic) are not ported.
+
+Do **not** also wrap the AWS HTTP transport with `http/transport.New` — this middleware already injects
+trace context; double-wrapping creates duplicate spans.
 
 ## slog
 

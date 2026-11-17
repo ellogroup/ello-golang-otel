@@ -87,3 +87,9 @@ adaptations. Also logged ADR-001: the developer explicitly chose to
 adopt the template's `goimports -local` grouping over this repo's prior
 documented single-block import convention, after being asked directly
 about the conflict.
+
+### 2026-11-17 — Remove deprecated contrib modules
+
+Vendored X-Ray propagator/ID generator into `internal/xray`; replaced `otelaws` with SDK-native
+tracing/metrics adapters, then revised: ported the `otelaws` core into `aws/middleware` keeping
+`AppendToConfig` (adds trace header injection). README/AGENTS.md updated; see ADR-002, ADR-003, TD-001..003.

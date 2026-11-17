@@ -51,3 +51,45 @@ direction is sufficient.]
 **Resolution target:** [Current sprint | This quarter | Next quarter | Backlog | Accepted risk]
 
 ---
+
+---
+
+### TD-001 — X-Ray ID generator paired with TraceIDRatioBased sampler
+
+**Raised:** 2026-11-17
+**Problem:** Upstream advises against using the X-Ray ID generator with `TraceIDRatioBased`
+(timestamp-prefixed IDs may skew sampling). `provider/tracer.go` does this when `WithXRay()` and
+`OTEL_SAMPLE_RATE < 1`.
+**Proposed resolution:** Evaluate a different sampler when X-Ray is enabled; vendored `internal/xray` is now ours to maintain.
+**Effort estimate:** S
+**Resolution target:** Backlog
+
+---
+
+### TD-002 — Vendored `internal/xray` copy of a deprecated upstream module
+
+**Raised:** 2026-11-17
+**Problem:** `internal/xray` is vendored from `go.opentelemetry.io/contrib/propagators/aws/xray` v1.47.0,
+deprecated upstream as abandoned (no code owners; see ADR-002). We own its maintenance. No AWS-maintained
+Go replacement was found (ADOT Go docs still reference the upstream package).
+**Proposed resolution:** Periodically check whether upstream is un-deprecated/adopted and switch back
+(steps in `AGENTS.md` "Vendored code — revisit periodically"). Separately, consider dropping the ID
+generator if consumers export via the CloudWatch OTLP endpoint (W3C IDs) rather than the ADOT X-Ray exporter.
+**Effort estimate:** S
+**Resolution target:** Backlog — recheck at each dependency bump
+**Last checked:** 2026-11-17 — still deprecated, no replacement found.
+
+---
+
+### TD-003 — Ported `aws/middleware` core of deprecated upstream `otelaws`
+
+**Raised:** 2026-11-17
+**Problem:** `aws/middleware` is a port of `go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-sdk-go-v2/otelaws`
+v0.72.0, deprecated upstream as abandoned (no code owners; see ADR-002/003). We own its maintenance;
+service-specific attribute builders were not ported.
+**Proposed resolution:** Periodically check whether upstream is un-deprecated/adopted and switch back
+(steps in `AGENTS.md` "Vendored code — revisit periodically"). Consider porting service attributes if
+consumers need them.
+**Effort estimate:** S
+**Resolution target:** Backlog — recheck at each dependency bump
+**Last checked:** 2026-11-17 — still deprecated, no replacement found.

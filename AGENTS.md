@@ -52,17 +52,18 @@ application repository shape do not hold here:
 
 ### Package architecture
 
-Six packages with a clear dependency hierarchy, plus one internal helper
-package:
+Six packages with a clear dependency hierarchy, plus internal helper
+packages:
 
 | Package | Purpose |
 |---|---|
 | `config/` | Reads all OTEL configuration from environment variables via `config.NewFromEnv()`. Key env vars: `OTEL_ENABLED`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`, `OTEL_SERVICE_VERSION`, `ENVIRONMENT`, `OTEL_SAMPLE_RATE`. |
 | `provider/` | Creates and globally registers OTEL providers: `NewTracerProvider(ctx, cfg, ...opts)` (with `WithLambda()` / `WithXRay()` options, plus the `NewLambdaTracerProvider(ctx, cfg)` convenience wrapper) and `NewMeterProvider(ctx, cfg)`, each returning a provider + shutdown func. When `OTEL_ENABLED=false`, both return no-op providers with zero overhead. Both always register W3C TraceContext and Baggage propagators globally. |
 | `lambda/middleware/` | AWS Lambda middleware that wraps handlers and instruments them: `NewAPIGatewayV1(tracer, meter)` for API Gateway v1 HTTP handlers (extracts W3C trace context from request headers, creates server spans, sets Error on 5xx or handler errors); `NewNoResponse[E any](tracer, meter, spanName)` for event-driven handlers (SQS, SNS, scheduled events) with no response instrumentation. |
-| `aws/middleware/` | `AppendToConfig(cfg *aws.Config)` instruments all AWS SDK v2 calls with OTel client spans (service, operation, region, request ID attributes) via the `otelaws` contrib package. Do not also wrap the AWS HTTP transport with `http/transport.New` — double-wrapping creates duplicate spans. |
+| `aws/middleware/` | `AppendToConfig(cfg *aws.Config)` instruments all AWS SDK v2 calls with OTel client spans (service/operation, region, request ID, HTTP status attributes) and injects trace context into outgoing requests. A port of the deprecated upstream `otelaws` core (see "Vendored code" below). Do not also wrap the AWS HTTP transport with `http/transport.New` — double-wrapping creates duplicate spans. |
 | `slog/handler/` | `New(inner slog.Handler)` wraps any `slog.Handler` to inject `trace_id` and `span_id` from the active OTEL span into every log record. No-op when OTEL is disabled. |
 | `http/transport/` | `New(base RoundTripper)` wraps an HTTP client's transport with OTEL instrumentation: creates child spans, injects W3C `traceparent`/`tracestate` headers for downstream propagation, and records HTTP attributes. |
+| `internal/xray/` | Vendored X-Ray propagator + ID generator (from the deprecated `contrib/propagators/aws`), used by `provider.WithXRay()`. |
 | `internal/default/` | Private helpers for parsing env vars with defaults: `StrToBoolOrDefault`, `StrToFloat64OrDefault`, `NonEmptyOrDefault`. |
 
 ### Key design decisions
@@ -77,6 +78,32 @@ package:
   `OTEL_SAMPLE_RATE`.
 - **Ello ecosystem dependency** — `ello-golang-aws` supplies the Lambda
   middleware interfaces this library wraps.
+
+### Vendored code — revisit periodically
+
+Two pieces of this repo are copies/ports of upstream OpenTelemetry contrib modules that were
+deprecated as "no longer supported" because they were abandoned (no code owners):
+
+| Local code | Upstream module | Debt |
+|---|---|---|
+| `internal/xray/` (vendored, v1.47.0) | `go.opentelemetry.io/contrib/propagators/aws` | TD-002 |
+| `aws/middleware/` (core ported from v0.72.0) | `go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-sdk-go-v2/otelaws` | TD-003 |
+
+**When working in this repo (especially on dependency bumps, `provider/`, `aws/middleware/`, or
+X-Ray tasks), check whether upstream has been un-deprecated or adopted by a maintainer, and if so
+switch back:**
+
+1. For each module, check the latest version for a deprecation marker —
+   `go list -m -json <module>@latest` (look for a `Deprecated` field) and the `// Deprecated:` line
+   in its `go.mod`.
+2. Check upstream issue
+   [#5547](https://github.com/open-telemetry/opentelemetry-go-contrib/issues/5547) and the module's
+   `CHANGELOG.md` for a new owner or an AWS-maintained replacement.
+3. If maintained again: remove the local copy, import upstream (`internal/xray` → provider import;
+   `aws/middleware` → `otelaws.AppendMiddlewares(&cfg.APIOptions)` or a thin wrapper), `go mod tidy`,
+   and update the package table above, add a superseding ADR, and update the TD entry in
+   `.agents/memory/techdebt.md`.
+4. If not, leave it and record the date checked in the TD entry.
 
 ### Documentation
 
