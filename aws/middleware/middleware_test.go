@@ -68,6 +68,7 @@ func TestAppendToConfig_CreatesSpanAndInjectsTraceContext(t *testing.T) {
 	assert.Equal(t, "eu-west-2", attrs["aws.region"])
 	assert.Equal(t, int64(200), attrs["http.response.status_code"])
 	assert.Equal(t, "req-123", attrs["aws.request_id"])
+	assert.Equal(t, "aws_sqs", attrs["messaging.system"])
 
 	require.NotNil(t, stub.got)
 	assert.Contains(t, stub.got.Header.Get("traceparent"), spans[0].SpanContext().TraceID().String())

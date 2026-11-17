@@ -32,11 +32,16 @@ type IDGenerator struct {
 
 var _ sdktrace.IDGenerator = &IDGenerator{}
 
+// NewIDGenerator returns an IDGenerator reference used for sending traces to AWS X-Ray.
+func NewIDGenerator() *IDGenerator {
+	return &IDGenerator{}
+}
+
 // NewSpanID returns a non-zero span ID from a randomly-chosen sequence.
 func (gen *IDGenerator) NewSpanID(context.Context, trace.TraceID) trace.SpanID { //nolint:revive // ignore linter
 	sid := trace.SpanID{}
 	for {
-		binary.NativeEndian.PutUint64(sid[:], rand.Uint64()) //nolint:gosec // G404: Use of weak random number generator (math/rand instead of crypto/rand) is ignored as this is not security-sensitive.
+		binary.NativeEndian.PutUint64(sid[:], rand.Uint64()) // #nosec G404 -- trace and span IDs are not security-sensitive
 		if sid.IsValid() {
 			break
 		}
@@ -53,22 +58,17 @@ func (gen *IDGenerator) NewIDs(context.Context) (trace.TraceID, trace.SpanID) { 
 	tid := trace.TraceID{}
 	currentTime := getCurrentTimeHex()
 	copy(tid[:4], currentTime)
-	binary.NativeEndian.PutUint64(tid[4:12], rand.Uint64())  //nolint:gosec // G404: Use of weak random number generator (math/rand instead of crypto/rand) is ignored as this is not security-sensitive.
-	binary.NativeEndian.PutUint32(tid[12:16], rand.Uint32()) //nolint:gosec // G404: Use of weak random number generator (math/rand instead of crypto/rand) is ignored as this is not security-sensitive.
+	binary.NativeEndian.PutUint64(tid[4:12], rand.Uint64())  // #nosec G404 -- trace and span IDs are not security-sensitive
+	binary.NativeEndian.PutUint32(tid[12:16], rand.Uint32()) // #nosec G404 -- trace and span IDs are not security-sensitive
 
 	sid := trace.SpanID{}
 	for {
-		binary.NativeEndian.PutUint64(sid[:], rand.Uint64()) //nolint:gosec // G404: Use of weak random number generator (math/rand instead of crypto/rand) is ignored as this is not security-sensitive.
+		binary.NativeEndian.PutUint64(sid[:], rand.Uint64()) // #nosec G404 -- trace and span IDs are not security-sensitive
 		if sid.IsValid() {
 			break
 		}
 	}
 	return tid, sid
-}
-
-// NewIDGenerator returns an IDGenerator reference used for sending traces to AWS X-Ray.
-func NewIDGenerator() *IDGenerator {
-	return &IDGenerator{}
 }
 
 func getCurrentTimeHex() []uint8 {

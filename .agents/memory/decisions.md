@@ -128,8 +128,10 @@ required a breaking API change (providers are set per client `Options`, not `aws
 does not inject trace context into outgoing requests, which `otelaws` did.
 
 **Decision:** Port the core `otelaws` middleware (span, attributes, header injection) into
-`aws/middleware`, keeping `AppendToConfig(*aws.Config)`. Service-specific attribute builders and options
-were not ported. Not a breaking change for consumers except for span attributes/scope name.
+`aws/middleware`, keeping `AppendToConfig(*aws.Config)`. Configuration options were not ported. Service-specific
+attributes (DynamoDB/S3/SQS/SNS) were added afterwards using reflection on well-known input field names, to
+avoid importing the service SDK modules; a few rarely-used ones (DynamoDB index definitions, provisioned
+throughput, S3 DeleteObjects body) were left out. Not a breaking change for consumers except for span attributes/scope name.
 
 **Alternatives considered:** SDK-native providers + separate injection middleware (breaking, kept
 upstream-maintained code); rejected for API stability.

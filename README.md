@@ -133,7 +133,12 @@ The global TracerProvider (set by `provider.NewTracerProvider`) is used automati
 disabled the global provider is a no-op so spans are zero-overhead.
 
 This is a port of the core of the upstream `otelaws` contrib module, which is deprecated (abandoned).
-Service-specific attributes (DynamoDB table, SQS queue URL, S3 bucket, SNS topic) are not ported.
+Service-specific attributes are added for DynamoDB (table names, index, limit, projection, …), S3 (bucket,
+key, upload ID, …), SQS (`messaging.system`, queue URL as `server.address`) and SNS (destination name,
+operation, batch size). They are read by field name via reflection, so this module does not depend on the
+service SDK modules. These attributes include resource identifiers such as table names, bucket/key and queue
+URLs. Not ported: DynamoDB index/attribute definitions and provisioned throughput, and the S3 `DeleteObjects`
+body.
 
 Do **not** also wrap the AWS HTTP transport with `http/transport.New` — this middleware already injects
 trace context; double-wrapping creates duplicate spans.

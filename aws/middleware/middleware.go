@@ -6,8 +6,9 @@
 //
 // This is a port of the core of go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-sdk-go-v2/otelaws
 // (v0.72.0, Apache-2.0), which is deprecated upstream as abandoned (no code owners). Differences from
-// upstream: the per-service attribute builders (DynamoDB, S3, SQS, SNS) and configuration options were
-// not ported; the global TracerProvider and TextMapPropagator are always used.
+// upstream: the per-service attributes (DynamoDB, S3, SQS, SNS) are produced by reflection (see
+// attributes.go) rather than type switches, and a few rarely-used ones are not ported; configuration
+// options were not ported; the global TracerProvider and TextMapPropagator are always used.
 //
 // TODO(agent/maintainer): periodically check whether upstream otelaws has been un-deprecated and, if
 // so, replace this package's implementation with it again. See AGENTS.md "Vendored code — revisit
@@ -102,6 +103,7 @@ func initializeAfter(stack *middleware.Stack) error {
 				methodKey.String(methodName(serviceID, operation)),
 				regionKey.String(awsmiddleware.GetRegion(ctx)),
 			),
+			trace.WithAttributes(serviceAttributes(serviceID, in.Parameters)...),
 		}
 		if t, ok := ctx.Value(startTimeKey{}).(time.Time); ok {
 			startOpts = append(startOpts, trace.WithTimestamp(t))

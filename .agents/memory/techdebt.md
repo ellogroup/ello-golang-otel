@@ -86,10 +86,9 @@ generator if consumers export via the CloudWatch OTLP endpoint (W3C IDs) rather 
 **Raised:** 2026-11-17
 **Problem:** `aws/middleware` is a port of `go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-sdk-go-v2/otelaws`
 v0.72.0, deprecated upstream as abandoned (no code owners; see ADR-002/003). We own its maintenance;
-service-specific attribute builders were not ported.
+service attributes are reimplemented via reflection (`attributes.go`); a few rarely-used upstream attributes were not ported.
 **Proposed resolution:** Periodically check whether upstream is un-deprecated/adopted and switch back
-(steps in `AGENTS.md` "Vendored code — revisit periodically"). Consider porting service attributes if
-consumers need them.
+(steps in `AGENTS.md` "Vendored code — revisit periodically"). Reflection-based attributes rely on SDK field names; `attributes_test.go` uses the real SDK types to catch renames.
 **Effort estimate:** S
 **Resolution target:** Backlog — recheck at each dependency bump
 **Last checked:** 2026-11-17 — still deprecated, no replacement found.

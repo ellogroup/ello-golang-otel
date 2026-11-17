@@ -335,7 +335,8 @@ func BenchmarkPropagatorInject(b *testing.B) {
 	tracer := otel.Tracer("test")
 
 	req, _ := http.NewRequestWithContext(b.Context(), http.MethodGet, "http://example.com", http.NoBody)
-	ctx, _ := tracer.Start(b.Context(), "Parent operation...")
+	ctx, span := tracer.Start(b.Context(), "Parent operation...")
+	defer span.End()
 
 	b.ResetTimer()
 	for range b.N {
