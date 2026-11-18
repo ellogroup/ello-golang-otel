@@ -91,3 +91,50 @@ memory or an outdated local note should be pointed at this ADR.
 - Confluence runbook: "Runbook: Retrofitting the Go App Template (AI Integration + Go Tooling)" (EP space, page 1341063170)
 
 ---
+
+### ADR-002 — Remove deprecated otelaws / propagators/aws contrib modules
+
+**Date:** 2026-11-17
+**Status:** Accepted
+**Author:** AI-assisted (Claude Code) — reviewed by Dave Richards
+
+**Context:**
+`otelaws` and `propagators/aws` are marked "no longer supported" upstream
+with no named successor.
+
+**Decision:**
+- X-Ray propagator + ID generator vendored into `internal/xray` (Apache-2.0,
+  attribution retained). `provider.WithXRay()` API unchanged.
+- AWS SDK instrumentation: see ADR-003 (supersedes an initial plan to use the SDK's native OTel support).
+
+**Alternatives considered:** dropping X-Ray support (would break ADOT
+timestamp-prefixed trace IDs); keeping `AppendToConfig` via `APIOptions`
+(the SDK reads providers from client Options, not `aws.Config`).
+
+**Consequences:** breaking change for consumers (needs a version bump);
+span names/attributes differ from `otelaws`.
+
+---
+
+### ADR-003 — Port otelaws core into aws/middleware, keep AppendToConfig signature
+
+**Date:** 2026-11-17
+**Status:** Accepted
+**Author:** AI-assisted (Claude Code) — reviewed by Dave Richards
+
+**Context:**
+Replacing `otelaws` (ADR-002) with the SDK-native OTel adapters (smithy-go `smithyoteltracing`) would have
+required a breaking API change (providers are set per client `Options`, not `aws.Config`) and, on inspection,
+does not inject trace context into outgoing requests, which `otelaws` did.
+
+**Decision:** Port the core `otelaws` middleware (span, attributes, header injection) into
+`aws/middleware`, keeping `AppendToConfig(*aws.Config)`. Configuration options were not ported. Service-specific
+attributes (DynamoDB/S3/SQS/SNS) were added afterwards using reflection on well-known input field names, to
+avoid importing the service SDK modules; a few rarely-used ones (DynamoDB index definitions, provisioned
+throughput, S3 DeleteObjects body) were left out. Not a breaking change for consumers except for span attributes/scope name.
+
+**Alternatives considered:** SDK-native providers + separate injection middleware (breaking, kept
+upstream-maintained code); rejected for API stability.
+
+**Consequences:** We maintain ~150 lines of ported code; see TD-003 and the AGENTS.md revisit instruction.
+Supersedes the AWS SDK part of ADR-002.

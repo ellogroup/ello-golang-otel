@@ -22,5 +22,6 @@ func resolveSignalEndpoint(endpoint, defaultPath string) (string, error) {
 	if u.Path != "" {
 		return endpoint, nil
 	}
+	// #nosec G125 -- defaultPath is a fixed signal path (e.g. "v1/traces") supplied by this package, not user input.
 	return url.JoinPath(endpoint, defaultPath)
 }

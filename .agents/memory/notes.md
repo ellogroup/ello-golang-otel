@@ -43,3 +43,12 @@ Temporary working notes from the current or recent session. May be cleared
 once no longer relevant.
 
 [Working notes here.]
+
+### 2026-11-17 — /check-security on commit 9c42504 (otel contrib removal)
+
+No Critical/High findings. Notes: (1) `aws/middleware` injects the global propagator's headers
+(incl. W3C `baggage` if set) into every AWS request — same as upstream `otelaws`; callers must not put
+PII/secrets in baggage. (2) `go-vulncheck` could not be run (not installed; `go run …@latest` was blocked by
+the auto-mode classifier) — vulnerability scan of deps is outstanding. (3) Dependencies `aws-sdk-go-v2/service/sqs`
+(test-only) and `smithy-go` became direct requires (already approved modules / already transitive).
+(4) Ported/vendored deprecated code tracked as TD-002/TD-003.

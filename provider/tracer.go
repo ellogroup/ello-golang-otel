@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"go.opentelemetry.io/contrib/propagators/aws/xray"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/propagation"
@@ -15,6 +14,7 @@ import (
 	"go.opentelemetry.io/otel/trace/noop"
 
 	"github.com/ellogroup/ello-golang-otel/config"
+	"github.com/ellogroup/ello-golang-otel/internal/xray"
 )
 
 // Option configures the TracerProvider.

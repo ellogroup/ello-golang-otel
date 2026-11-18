@@ -115,9 +115,9 @@ Both middlewares record the following metrics on every invocation:
 
 ### Middleware
 
-Instruments all AWS SDK v2 calls with OpenTelemetry client spans. Each SDK call records `aws.service`,
-`aws.operation`, `aws.region`, and `aws.request_id` attributes, and propagates W3C trace context into
-outgoing HTTP request headers.
+Instruments all AWS SDK v2 calls with OpenTelemetry client spans. Each SDK call records `rpc.system.name`,
+`rpc.method`, `aws.region`, `aws.request_id` and `http.response.status_code` attributes, and injects trace
+context (via the global propagator) into outgoing HTTP request headers.
 
 Call `AppendToConfig` once after building your `aws.Config`:
 
@@ -132,8 +132,16 @@ awsmiddleware.AppendToConfig(&cfg)
 The global TracerProvider (set by `provider.NewTracerProvider`) is used automatically. When OTEL is
 disabled the global provider is a no-op so spans are zero-overhead.
 
-Do **not** also wrap the AWS HTTP transport with `http/transport.New` — `otelaws` handles trace
-propagation at the SDK middleware layer; double-wrapping creates duplicate spans.
+This is a port of the core of the upstream `otelaws` contrib module, which is deprecated (abandoned).
+Service-specific attributes are added for DynamoDB (table names, index, limit, projection, …), S3 (bucket,
+key, upload ID, …), SQS (`messaging.system`, queue URL as `server.address`) and SNS (destination name,
+operation, batch size). They are read by field name via reflection, so this module does not depend on the
+service SDK modules. These attributes include resource identifiers such as table names, bucket/key and queue
+URLs. Not ported: DynamoDB index/attribute definitions and provisioned throughput, and the S3 `DeleteObjects`
+body.
+
+Do **not** also wrap the AWS HTTP transport with `http/transport.New` — this middleware already injects
+trace context; double-wrapping creates duplicate spans.
 
 ## slog
 
